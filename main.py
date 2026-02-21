@@ -16,13 +16,15 @@ import re
 import time
 from pathlib import Path
 
+from ui import show_sensitive_popup
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # --- Optional imports (gracefully skip if not installed) ---
 try:
     import pytesseract
     from PIL import Image
-    pytesseract.pytesseract.tesseract_cmd = pytesseract.pytesseract.tesseract_cmd = os.path.join(BASE_DIR, "Tesseract-OCR", "tesseract.exe")
+    pytesseract.pytesseract.tesseract_cmd = os.path.join(BASE_DIR, "Tesseract-OCR", "tesseract.exe")
     OCR_AVAILABLE = True
 except ImportError:
     OCR_AVAILABLE = False
@@ -214,6 +216,8 @@ def scan_file(filepath):
             print(f"      Occurrences : {count}")
             print(f"      Sample match: {sample}")
             print()
+        # Show popup with details and ask if user wants to encrypt
+        show_sensitive_popup(filepath, findings, is_id)
     else:
         print(f"\n  ✅ No sensitive data detected.")
 
