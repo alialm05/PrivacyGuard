@@ -26,6 +26,24 @@ def encrypt_to_zip(filepath, password):
         return None
 
 
+def add_to_existing_zip(filepath, zip_path, password):
+    """
+    Append a file to an existing AES-encrypted ZIP archive.
+    Returns True on success, False on failure.
+    """
+    try:
+        with pyzipper.AESZipFile(zip_path, 'a',
+                                  compression=pyzipper.ZIP_DEFLATED,
+                                  encryption=pyzipper.WZ_AES) as zf:
+            zf.setpassword(password.encode())
+            zf.write(filepath, os.path.basename(filepath))
+        print(f"  [OK] File added to existing archive: {zip_path}")
+        return True
+    except Exception as e:
+        print(f"  [!] Failed to add to existing archive: {e}")
+        return False
+
+
 def delete_file(filepath):
     """Delete a file and return True on success, False on failure."""
     try:

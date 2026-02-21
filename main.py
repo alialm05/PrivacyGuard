@@ -14,6 +14,7 @@ You also need Tesseract installed on your system:
 import os
 import re
 import time
+import threading
 from pathlib import Path
 
 from ui import show_sensitive_popup
@@ -69,6 +70,7 @@ PATTERNS = {
     "Driver's License Keywords":r"(?i)(driver.?s?\s+license|DL#|DOB|date of birth|expir)",
     "Health/Medical Info":      r"(?i)(diagnosis|prescription|patient\s+id|medicare|medicaid|insurance\s+id)",
     "SIN (Canada)":             r"\b\d{3}\s\d{3}\s\d{3}\b",
+    "Date of Birth":            r"\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b",
 }
 
 # ID document keyword clusters — if enough appear together it's likely an ID scan
@@ -80,6 +82,8 @@ ID_KEYWORDS = [
     "ln", "fn",                      # last name / first name labels
     "identification", "donor",       # common ID card labels
     "dl#", "id#", "state id",        # explicit ID markers
+    "legal name", "date of birth",     # more verbose keywords
+    "classified", "confidential", "for official use only"  # security markings often on IDs
 ]
 
 
@@ -291,17 +295,23 @@ def scan_folder_once(folder_path):
 
 if __name__ == "__main__":
     import sys
-
-    # --- CHANGE THIS PATH or pass as argument ---
-    # Later this will be a folder picker in the UI
-    WATCH_FOLDER = "~/Downloads"
-
-    if len(sys.argv) > 1:
-        WATCH_FOLDER = sys.argv[1]
+    import config
+    import tray
 
     if "--scan-once" in sys.argv:
-        # Scan all existing files and exit (good for testing)
-        scan_folder_once(WATCH_FOLDER)
+        # Headless one-shot scan (useful for testing)
+        folder = sys.argv[1] if len(sys.argv) > 1 else config.get("watch_folder")
+        scan_folder_once(folder)
     else:
-        # Live watch mode — monitors for new files
-        watch_folder(WATCH_FOLDER)
+        # Start the folder watcher in a background thread
+        watch_folder_path = config.get("watch_folder")
+        watcher_thread = threading.Thread(
+            target=watch_folder,
+            args=(watch_folder_path,),
+            daemon=True
+        )
+        watcher_thread.start()
+
+        # Launch the settings window + system tray on the main thread
+        # (blocks here until the user clicks Quit in the tray)
+        tray.launch()

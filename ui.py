@@ -8,7 +8,8 @@ import threading
 import tkinter as tk
 from tkinter import messagebox
 
-from zipper import encrypt_to_zip, delete_file
+import config
+from zipper import encrypt_to_zip, add_to_existing_zip, delete_file
 
 
 def show_sensitive_popup(filepath, findings, is_id):
@@ -19,7 +20,8 @@ def show_sensitive_popup(filepath, findings, is_id):
     def run_popup():
         root = tk.Tk()
         root.withdraw()  # Hide blank root window
-
+        root.attributes('-topmost', True)  # Appear above all other windows
+        
         filename = os.path.basename(filepath)
 
         # Build summary message
@@ -28,21 +30,103 @@ def show_sensitive_popup(filepath, findings, is_id):
             lines.append("- Likely ID document (driver's license or passport)")
         for label, sample, count in findings:
             lines.append(f"- {label} ({count} occurrence{'s' if count > 1 else ''})")
-        lines.append("\nWould you like to encrypt this file into a password-protected ZIP?")
         message = "\n".join(lines)
 
-        # Ask yes/no
-        encrypt = messagebox.askyesno(
-            title="Privacy Scanner - Sensitive File Detected",
-            message=message
-        )
+        archive_path = config.get("archive_path")
+        archive_password = config.get_archive_password()
 
-        if encrypt:
-            _show_password_window(root, filepath)
+        if archive_path and archive_password:
+            # Offer 3 choices: add to existing archive, create new zip, or skip
+            print(f"\n[Popup] Existing archive configured: {os.path.basename(archive_path)}")
+            _show_action_dialog(root, filepath, message, archive_path, archive_password)
+
+        else:
+            print(f"\n[Popup] No archive configured. Prompting to create new encrypted ZIP.")
+            # Fallback: simple yes/no for creating a new encrypted ZIP
+            lines.append("\nWould you like to encrypt this file into a password-protected ZIP?")
+            encrypt = messagebox.askyesno(
+                title="Privacy Scanner - Sensitive File Detected",
+                message="\n".join(lines)
+            )
+            if encrypt:
+                _show_password_window(root, filepath)
 
         root.destroy()
 
     threading.Thread(target=run_popup, daemon=True).start()
+
+
+def _show_action_dialog(root, filepath, summary_message, archive_path, archive_password):
+    """
+    Show a custom 3-button dialog when an existing archive is configured:
+      [Add to Archive]  [Create New ZIP]  [Skip]
+    """
+    dlg = tk.Toplevel(root)
+    dlg.title("Privacy Scanner — Sensitive File Detected")
+    dlg.resizable(False, False)
+    dlg.attributes('-topmost', True)
+    dlg.grab_set()
+
+    tk.Label(
+        dlg, text=summary_message,
+        justify="left", padx=20, pady=14, anchor="w"
+    ).pack(fill="x")
+
+    tk.Frame(dlg, height=1, bg="#dcdde1").pack(fill="x", padx=0)
+
+    tk.Label(
+        dlg,
+        text=f"Archive: {os.path.basename(archive_path)}",
+        font=("Segoe UI", 8), fg="#7f8c8d", padx=20, pady=4
+    ).pack(anchor="w")
+
+    btn_frame = tk.Frame(dlg, padx=16, pady=12)
+    btn_frame.pack()
+
+    choice = tk.StringVar(value="skip")
+
+    def pick(value):
+        choice.set(value)
+        dlg.destroy()
+
+    tk.Button(
+        btn_frame, text="Add to Existing Archive",
+        bg="#2980b9", fg="white", padx=10, pady=5, font=("Segoe UI", 9, "bold"),
+        command=lambda: pick("archive")
+    ).pack(side="left", padx=(0, 8))
+
+    tk.Button(
+        btn_frame, text="Create New ZIP",
+        bg="#27ae60", fg="white", padx=10, pady=5,
+        command=lambda: pick("new_zip")
+    ).pack(side="left", padx=(0, 8))
+
+    tk.Button(
+        btn_frame, text="Skip",
+        padx=10, pady=5,
+        command=lambda: pick("skip")
+    ).pack(side="left")
+
+    root.wait_window(dlg)
+
+    if choice.get() == "archive":
+        success = add_to_existing_zip(filepath, archive_path, archive_password)
+        if success:
+            should_delete = messagebox.askyesno(
+                title="File Added to Archive",
+                message=f"Added to:\n{os.path.basename(archive_path)}\n\nDelete the original unencrypted file?",
+                parent=root
+            )
+            if should_delete:
+                from zipper import delete_file
+                delete_file(filepath)
+        else:
+            messagebox.showerror(
+                "Error", "Could not add file to archive. Check the console for details.",
+                parent=root
+            )
+    elif choice.get() == "new_zip":
+        _show_password_window(root, filepath)
 
 
 def _show_password_window(root, filepath):
@@ -51,27 +135,29 @@ def _show_password_window(root, filepath):
     password_window.title("Set Encryption Password")
     password_window.resizable(False, False)
     password_window.grab_set()  # Make it modal
+    password_window.attributes('-topmost', True)  # Appear above all other windows
 
     tk.Label(password_window, text="Enter a password for the encrypted ZIP:",
              padx=20, pady=10).pack()
 
-    password_var = tk.StringVar()
-    password_entry = tk.Entry(password_window, textvariable=password_var,
-                              show="*", width=30)
+    password_entry = tk.Entry(password_window, show="*", width=30)
     password_entry.pack(padx=20)
     password_entry.focus()
 
     tk.Label(password_window, text="Confirm password:", padx=20, pady=5).pack()
-    confirm_var = tk.StringVar()
-    tk.Entry(password_window, textvariable=confirm_var,
-             show="*", width=30).pack(padx=20)
+    confirm_entry = tk.Entry(password_window, show="*", width=30)
+    confirm_entry.pack(padx=20)
 
     error_label = tk.Label(password_window, text="", fg="red")
     error_label.pack(pady=5)
 
     def on_confirm():
-        password = password_var.get()
-        confirm = confirm_var.get()
+        password = password_entry.get()
+        confirm = confirm_entry.get()
+
+        print("password enered: ", password)
+        print("confirmed password enered: ", confirm)
+        
 
         if len(password) < 6:
             error_label.config(text="Password must be at least 6 characters.")
@@ -94,6 +180,7 @@ def _handle_encryption(filepath, password):
     """Run encryption and ask user whether to delete the original."""
     root = tk.Tk()
     root.withdraw()
+    root.attributes('-topmost', True)  # Appear above all other windows
 
     zip_path = encrypt_to_zip(filepath, password)
 
