@@ -7,6 +7,22 @@ import os
 import pyzipper
 
 
+def create_empty_zip(zip_path, password):
+    """
+    Create a new empty AES-256 encrypted ZIP archive at zip_path.
+    Returns True on success, False on failure.
+    """
+    try:
+        zfz = pyzipper.AESZipFile(zip_path, 'w', compression=pyzipper.ZIP_DEFLATED, encryption=pyzipper.WZ_AES)
+        zfz.setpassword(password.encode())
+        zfz.close()
+        print(f"  [OK] New guarded archive created: {zip_path}")
+        return True
+    except Exception as e:
+        print(f"  [!] Failed to create archive: {e}")
+        return False
+
+
 def encrypt_to_zip(filepath, password):
     """
     Encrypt a file into a password-protected AES-256 ZIP next to the original.
@@ -14,11 +30,10 @@ def encrypt_to_zip(filepath, password):
     """
     zip_path = filepath + ".encrypted.zip"
     try:
-        with pyzipper.AESZipFile(zip_path, 'w',
-                                  compression=pyzipper.ZIP_DEFLATED,
-                                  encryption=pyzipper.WZ_AES) as zf:
-            zf.setpassword(password.encode())
-            zf.write(filepath, os.path.basename(filepath))
+        zf = pyzipper.AESZipFile(zip_path, 'w', compression=pyzipper.ZIP_DEFLATED, encryption=pyzipper.WZ_AES)
+        zf.setpassword(password.encode())
+        zf.write(filepath, os.path.basename(filepath))
+        zf.close()
         print(f"  [OK] Encrypted ZIP created: {zip_path}")
         return zip_path
     except Exception as e:
@@ -32,11 +47,10 @@ def add_to_existing_zip(filepath, zip_path, password):
     Returns True on success, False on failure.
     """
     try:
-        with pyzipper.AESZipFile(zip_path, 'a',
-                                  compression=pyzipper.ZIP_DEFLATED,
-                                  encryption=pyzipper.WZ_AES) as zf:
-            zf.setpassword(password.encode())
-            zf.write(filepath, os.path.basename(filepath))
+        zf = pyzipper.AESZipFile(zip_path, 'a', compression=pyzipper.ZIP_DEFLATED, encryption=pyzipper.WZ_AES)
+        zf.setpassword(password.encode())
+        zf.write(filepath, os.path.basename(filepath))
+        zf.close()
         print(f"  [OK] File added to existing archive: {zip_path}")
         return True
     except Exception as e:
