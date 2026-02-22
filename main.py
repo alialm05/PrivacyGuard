@@ -70,7 +70,7 @@ PATTERNS = {
     "Driver's License Keywords":r"(?i)(driver.?s?\s+license|DL#|DOB|date of birth|expir)",
     "Health/Medical Info":      r"(?i)(diagnosis|prescription|patient\s+id|medicare|medicaid|insurance\s+id)",
     "SIN (Canada)":             r"\b\d{3}\s\d{3}\s\d{3}\b",
-    "Date of Birth":            r"\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b",
+    "Date of Birth":            r"\b\d{1,4}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{1,4}\b",
 }
 
 # ID document keyword clusters — if enough appear together it's likely an ID scan
@@ -300,17 +300,17 @@ if __name__ == "__main__":
 
     if "--scan-once" in sys.argv:
         # Headless one-shot scan (useful for testing)
-        folder = sys.argv[1] if len(sys.argv) > 1 else config.get("watch_folder")
-        scan_folder_once(folder)
+        folders = config.get_watch_folders()
+        for folder in folders:
+            scan_folder_once(folder)
     else:
-        # Start the folder watcher in a background thread
-        watch_folder_path = config.get("watch_folder")
-        watcher_thread = threading.Thread(
-            target=watch_folder,
-            args=(watch_folder_path,),
-            daemon=True
-        )
-        watcher_thread.start()
+        # Start one watcher thread per configured folder
+        for watch_folder_path in config.get_watch_folders():
+            threading.Thread(
+                target=watch_folder,
+                args=(watch_folder_path,),
+                daemon=True
+            ).start()
 
         # Launch the settings window + system tray on the main thread
         # (blocks here until the user clicks Quit in the tray)

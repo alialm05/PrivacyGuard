@@ -10,7 +10,7 @@ import os
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 
 _defaults = {
-    "watch_folder": os.path.expanduser("~/Downloads"),
+    "watch_folders": [os.path.expanduser("~/Downloads")],
     "archive_path": "",   # path to the user's existing encrypted ZIP
 }
 
@@ -46,6 +46,15 @@ def save():
 def get(key: str, default=None):
     print(_config)
     return _config.get(key, _defaults.get(key, default))
+
+
+def get_watch_folders() -> list:
+    """Return the list of watch folders, migrating legacy single-folder config if needed."""
+    # Migrate old single watch_folder key to list
+    if "watch_folder" in _config and "watch_folders" not in _config:
+        _config["watch_folders"] = [_config.pop("watch_folder")]
+    folders = _config.get("watch_folders", _defaults["watch_folders"])
+    return folders if isinstance(folders, list) else [folders]
 
 
 def set(key: str, value):

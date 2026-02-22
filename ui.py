@@ -3,6 +3,7 @@ ui.py
 Handles all tkinter popup UI for the Privacy Scanner.
 """
 
+from logging import root
 import os
 import threading
 import tkinter as tk
@@ -12,6 +13,16 @@ import config
 from zipper import encrypt_to_zip, add_to_existing_zip, delete_file
 
 
+def _lift(root):
+    """Move root off-screen and show it so messageboxes appear on top without a visible blank window."""
+    root.geometry("1x1+-32000+-32000")
+    root.deiconify()
+    root.attributes('-topmost', True)
+    #root.lift()
+    #root.focus_force()
+    root.update()
+
+
 def show_sensitive_popup(filepath, findings, is_id):
     """
     Show a popup when sensitive data is detected.
@@ -19,8 +30,8 @@ def show_sensitive_popup(filepath, findings, is_id):
     """
     def run_popup():
         root = tk.Tk()
-        root.withdraw()  # Hide blank root window
-        root.attributes('-topmost', True)  # Appear above all other windows
+        root.withdraw()
+        root.attributes('-topmost', True)
         
         filename = os.path.basename(filepath)
 
@@ -44,10 +55,13 @@ def show_sensitive_popup(filepath, findings, is_id):
             print(f"\n[Popup] No archive configured. Prompting to create new encrypted ZIP.")
             # Fallback: simple yes/no for creating a new encrypted ZIP
             lines.append("\nWould you like to encrypt this file into a password-protected ZIP?")
+            _lift(root)
             encrypt = messagebox.askyesno(
                 title="Privacy Scanner - Sensitive File Detected",
-                message="\n".join(lines)
+                message="\n".join(lines),
+                parent=root
             )
+            root.withdraw()
             if encrypt:
                 _show_password_window(root, filepath)
 
@@ -112,19 +126,23 @@ def _show_action_dialog(root, filepath, summary_message, archive_path, archive_p
     if choice.get() == "archive":
         success = add_to_existing_zip(filepath, archive_path, archive_password)
         if success:
+            _lift(root)
             should_delete = messagebox.askyesno(
                 title="File Added to Archive",
                 message=f"Added to:\n{os.path.basename(archive_path)}\n\nDelete the original unencrypted file?",
                 parent=root
             )
+            root.withdraw()
             if should_delete:
                 from zipper import delete_file
                 delete_file(filepath)
         else:
+            _lift(root)
             messagebox.showerror(
                 "Error", "Could not add file to archive. Check the console for details.",
                 parent=root
             )
+            root.withdraw()
     elif choice.get() == "new_zip":
         _show_password_window(root, filepath)
 
@@ -137,12 +155,14 @@ def _show_password_window(root, filepath):
     password_window.grab_set()  # Make it modal
     password_window.attributes('-topmost', True)  # Appear above all other windows
 
+    password_window.focus_force()
+
     tk.Label(password_window, text="Enter a password for the encrypted ZIP:",
              padx=20, pady=10).pack()
 
     password_entry = tk.Entry(password_window, show="*", width=30)
     password_entry.pack(padx=20)
-    password_entry.focus()
+    password_window.after(100, lambda: (password_window.lift(), password_window.focus_force(), password_entry.focus_set()))
 
     tk.Label(password_window, text="Confirm password:", padx=20, pady=5).pack()
     confirm_entry = tk.Entry(password_window, show="*", width=30)
@@ -167,39 +187,43 @@ def _show_password_window(root, filepath):
             return
 
         password_window.destroy()
-        _handle_encryption(filepath, password)
+        _handle_encryption(root, filepath, password)
 
-    tk.Button(password_window, text="Encrypt", command=on_confirm,
-              bg="#2ecc71", fg="white", padx=10, pady=5).pack(pady=10)
+    tk.Button(
+        password_window, text="Encrypt", command=on_confirm,
+        bg="#307bc5", fg="white", padx=14, pady=4, font=("Segoe UI", 9, "bold")).pack(pady=10)
 
     password_window.bind("<Return>", lambda e: on_confirm())
     root.wait_window(password_window)
 
 
-def _handle_encryption(filepath, password):
+def _handle_encryption(root, filepath, password):
     """Run encryption and ask user whether to delete the original."""
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes('-topmost', True)  # Appear above all other windows
-
     zip_path = encrypt_to_zip(filepath, password)
 
     if zip_path:
+        _lift(root)
         should_delete = messagebox.askyesno(
             title="Delete Original?",
             message=f"Encrypted ZIP created successfully!\n\n"
                     f"{os.path.basename(zip_path)}\n\n"
-                    f"Do you want to delete the original unencrypted file?"
+                    f"Do you want to delete the original unencrypted file?",
+            parent=root
         )
+        root.withdraw()
         if should_delete:
             success = delete_file(filepath)
+            _lift(root)
             if success:
-                messagebox.showinfo("Done", "Original file deleted. Only the encrypted ZIP remains.")
+                messagebox.showinfo("Done", "Original file deleted. Only the encrypted ZIP remains.", parent=root)
             else:
-                messagebox.showerror("Error", "Could not delete the original file. Check console for details.")
+                messagebox.showerror("Error", "Could not delete the original file. Check console for details.", parent=root)
+            root.withdraw()
         else:
-            messagebox.showinfo("Done", "Encrypted ZIP saved. Original file kept.")
+            _lift(root)
+            messagebox.showinfo("Done", "Encrypted ZIP saved. Original file kept.", parent=root)
+            root.withdraw()
     else:
-        messagebox.showerror("Error", "Encryption failed. Check the console for details.")
-
-    root.destroy()
+        _lift(root)
+        messagebox.showerror("Error", "Encryption failed. Check the console for details.", parent=root)
+        root.withdraw()
