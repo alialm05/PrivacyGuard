@@ -1,4 +1,5 @@
 ﻿# 🛡️ PrivacyGuard
+### Team: Marmot-Hacker
 
 A lightweight Python desktop app that runs silently in your system tray, watches one or more folders, and scans every new file for sensitive or personal data - catching things like credit card numbers, government IDs, API keys, and more before they leave your machine.
 
