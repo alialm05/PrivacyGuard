@@ -14,7 +14,7 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageTk
 import pystray
 
 import config
@@ -28,6 +28,7 @@ _root: tk.Tk | None = None      # the one persistent Tk root
 _tray_icon: pystray.Icon | None = None
 
 
+# ─────────────────────────────────────────
 # ─────────────────────────────────────────
 #  TRAY ICON IMAGE  (drawn with PIL)
 # ─────────────────────────────────────────
@@ -239,6 +240,16 @@ def _build_window():
     BG = _apply_styles(root)
     root.configure(bg=BG)
 
+    # Pre-render section header icons from assets (refs kept on root to prevent GC)
+    def _load_icon(name):
+        path = os.path.join(BASE_DIR, "assets", name)
+        if os.path.exists(path):
+            return ImageTk.PhotoImage(Image.open(path).convert("RGBA").resize((16, 16), Image.LANCZOS))
+        return None
+    _folder_photo = _load_icon("folder.png")
+    _lock_photo   = _load_icon("lockicon.png")
+    root._icon_refs = [_folder_photo, _lock_photo]  # type: ignore
+
     # ── Header bar (plain tk so we can colour it) ────────────────────────────
     header = tk.Frame(root, bg="#2061a1", pady=14)
     header.pack(fill="x")
@@ -265,8 +276,11 @@ def _build_window():
     ).pack(anchor="w")
 
     # ── Watch Folders ───────────────────────────────────────────────────────
-    ttk.Label(body, text="📁  Watch Folders", style="H2.TLabel").grid(
-        row=1, column=0, sticky="w", pady=(0, 2))
+    wf_header = ttk.Frame(body)
+    wf_header.grid(row=1, column=0, sticky="w", pady=(0, 2))
+    if _folder_photo:
+        tk.Label(wf_header, image=_folder_photo, bg=BG, bd=0).pack(side="left", padx=(0, 6))
+    ttk.Label(wf_header, text="Watch Folders", style="H2.TLabel").pack(side="left")
     ttk.Label(body, text="Add one or more folders to monitor for sensitive files.",
               style="Sub.TLabel").grid(row=2, column=0, sticky="w", pady=(0, 6))
 
@@ -320,7 +334,11 @@ def _build_window():
     gf_section.grid(row=5, column=0, sticky="ew", pady=(20, 25))
     gf_section.columnconfigure(0, weight=1)
 
-    ttk.Label(gf_section, text="🔒  Guarded Folder", style="H2.TLabel").pack(fill="x")
+    gf_header = ttk.Frame(gf_section)
+    gf_header.pack(fill="x")
+    if _lock_photo:
+        tk.Label(gf_header, image=_lock_photo, bg=BG, bd=0).pack(side="left", padx=(0, 6))
+    ttk.Label(gf_header, text="Guarded Folder", style="H2.TLabel").pack(side="left")
     ttk.Label(
         gf_section,
         text="Sensitive files can be encrypted directly into a password-protected ZIP archive.",
