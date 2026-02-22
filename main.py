@@ -121,7 +121,7 @@ def extract_text_from_docx(filepath):
     if not DOCX_AVAILABLE:
         return ""
     try:
-        doc = Document(filepath)
+        doc = Document(os.path.normpath(filepath))
         return "\n".join(p.text for p in doc.paragraphs)
     except Exception as e:
         print(f"  [!] Could not read DOCX: {e}")

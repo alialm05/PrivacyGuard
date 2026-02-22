@@ -265,7 +265,7 @@ def _build_window():
     ).pack(anchor="w")
 
     # ── Watch Folders ───────────────────────────────────────────────────────
-    ttk.Label(body, text="Watch Folders", style="H2.TLabel").grid(
+    ttk.Label(body, text="📁  Watch Folders", style="H2.TLabel").grid(
         row=1, column=0, sticky="w", pady=(0, 2))
     ttk.Label(body, text="Add one or more folders to monitor for sensitive files.",
               style="Sub.TLabel").grid(row=2, column=0, sticky="w", pady=(0, 6))
@@ -317,10 +317,10 @@ def _build_window():
 
     # ── Guarded Folder ──────────────────────────────────────────────────────
     gf_section = ttk.Frame(body)
-    gf_section.grid(row=5, column=0, sticky="ew", pady=(40, 50))
+    gf_section.grid(row=5, column=0, sticky="ew", pady=(20, 25))
     gf_section.columnconfigure(0, weight=1)
 
-    ttk.Label(gf_section, text="Guarded Folder", style="H2.TLabel").pack(fill="x")
+    ttk.Label(gf_section, text="🔒  Guarded Folder", style="H2.TLabel").pack(fill="x")
     ttk.Label(
         gf_section,
         text="Sensitive files can be encrypted directly into a password-protected ZIP archive.",
@@ -338,11 +338,16 @@ def _build_window():
     def _refresh_guarded_label():
         name = os.path.basename(_guarded_path) if _guarded_path else "None configured"
         guarded_label.config(text=f"Current: {name}")
+        if _guarded_path:
+            pw_frame.pack(fill="x", pady=(8, 0))
+        else:
+            pw_frame.pack_forget()
 
     def _set_guarded(path, pw):
         nonlocal _guarded_path, _guarded_pw
         _guarded_path = path
         _guarded_pw   = pw
+        pw_var.set(pw)
         _refresh_guarded_label()
 
     def open_create_guarded():
@@ -355,6 +360,7 @@ def _build_window():
         nonlocal _guarded_path, _guarded_pw
         _guarded_path = ""
         _guarded_pw   = ""
+        pw_var.set("")
         _refresh_guarded_label()
 
     gf_btn_frame = ttk.Frame(gf_section)
@@ -366,6 +372,18 @@ def _build_window():
                command=open_select_guarded).pack(side="left", padx=(0, 6))
     ttk.Button(gf_btn_frame, text="✕ Clear",
                command=clear_guarded, style="Danger.TButton").pack(side="left")
+
+    # Inline password entry — shown only when a guarded folder is configured
+    pw_frame = ttk.Frame(gf_section)
+    pw_var = tk.StringVar(master=root, value=_guarded_pw)
+    ttk.Label(
+        pw_frame,
+        text="Enter the password for this ZIP so files can be sent here automatically. This password is saved only in memory",
+        style="Sub.TLabel", wraplength=380, justify="left"
+    ).pack(anchor="w", pady=(0, 4))
+    ttk.Entry(pw_frame, textvariable=pw_var, show="*", width=32).pack(anchor="w")
+    if _guarded_path:
+        pw_frame.pack(fill="x", pady=(8, 0))
 
     # ── Separator ────────────────────────────────────────────────────────────
     ttk.Separator(body, orient="horizontal").grid(
@@ -381,7 +399,8 @@ def _build_window():
 
         config.set("watch_folders", new_folders)
         config.set("archive_path", _guarded_path)
-        config.set_archive_password(_guarded_pw)
+        print("pw_var:", pw_var.get())
+        config.set_archive_password(pw_var.get())
         config.save()
 
         if folders_changed:

@@ -44,7 +44,6 @@ def save():
 
 
 def get(key: str, default=None):
-    print(_config)
     return _config.get(key, _defaults.get(key, default))
 
 

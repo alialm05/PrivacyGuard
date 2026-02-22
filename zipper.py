@@ -12,6 +12,7 @@ def create_empty_zip(zip_path, password):
     Create a new empty AES-256 encrypted ZIP archive at zip_path.
     Returns True on success, False on failure.
     """
+    zip_path = os.path.normpath(zip_path)
     try:
         zfz = pyzipper.AESZipFile(zip_path, 'w', compression=pyzipper.ZIP_DEFLATED, encryption=pyzipper.WZ_AES)
         zfz.setpassword(password.encode())
@@ -28,6 +29,7 @@ def encrypt_to_zip(filepath, password):
     Encrypt a file into a password-protected AES-256 ZIP next to the original.
     Returns the path to the ZIP file on success, or None on failure.
     """
+    filepath = os.path.normpath(filepath)
     zip_path = filepath + ".encrypted.zip"
     try:
         zf = pyzipper.AESZipFile(zip_path, 'w', compression=pyzipper.ZIP_DEFLATED, encryption=pyzipper.WZ_AES)
@@ -46,6 +48,8 @@ def add_to_existing_zip(filepath, zip_path, password):
     Append a file to an existing AES-encrypted ZIP archive.
     Returns True on success, False on failure.
     """
+    filepath = os.path.normpath(filepath)
+    zip_path = os.path.normpath(zip_path)
     try:
         zf = pyzipper.AESZipFile(zip_path, 'a', compression=pyzipper.ZIP_DEFLATED, encryption=pyzipper.WZ_AES)
         zf.setpassword(password.encode())
